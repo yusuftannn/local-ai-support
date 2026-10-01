@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="tr">
+  <meta charset="utf-8" /><meta
+    name="viewport"
+    content="width=device-width,initial-scale=1"
+  /><title>AI Talep Analizi</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background: #f4f7fb;
+      color: #172238;
+      font:
+        16px system-ui,
+        sans-serif;
+    }
+    main {
+      max-width: 900px;
+      margin: 60px auto;
+      padding: 24px;
+    }
+    header {
+      margin-bottom: 28px;
+    }
+    h1 {
+      font-size: 36px;
+      margin: 10px 0;
+    }
+    p {
+      color: #58667d;
+      line-height: 1.6;
+    }
+    .tag {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: #3660d3;
+    }
+    .card {
+      background: white;
+      border: 1px solid #dce3ef;
+      border-radius: 18px;
+      padding: 24px;
+      margin-bottom: 20px;
+    }
+    textarea {
+      width: 100%;
+      min-height: 170px;
+      resize: vertical;
+      font: inherit;
+      padding: 15px;
+      border: 1px solid #b6c3d6;
+      border-radius: 10px;
+      margin: 12px 0;
+    }
+    button {
+      background: #315bd3;
+      border: 0;
+      color: white;
+      border-radius: 9px;
+      padding: 13px 20px;
+      font: inherit;
+      cursor: pointer;
+    }
+    button:disabled {
+      opacity: 0.55;
+      cursor: wait;
+    }
+    .example {
+      background: #edf1fa;
+      color: #29406b;
+      font-size: 13px;
+      padding: 9px;
+      margin: 5px 5px 5px 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+    h2 {
+      font-size: 14px;
+      color: #596981;
+      margin: 0 0 10px;
+    }
+    .value {
+      white-space: pre-wrap;
+      line-height: 1.6;
+    }
+    #status {
+      font-size: 13px;
+    }
+    #error {
+      color: #a32032;
+    }
+    label {
+      font-weight: 600;
+    }
+    @media (max-width: 600px) {
+      main {
+        margin: 20px auto;
+      }
+      .grid {
+        grid-template-columns: 1fr;
+      }
+      h1 {
+        font-size: 28px;
+      }
+    }
+  </style>
+  <main>
+    <header>
+      <span class="tag">PYTHON × YAPAY ZEKA</span>
+      <h1>Talebi anla. Yanıtı hazırla.</h1>
+      <p>Yerel AI modeliyle kategori, konu, özet ve yanıt taslağı oluştur.</p>
+      <div id="status" role="status">Model bağlantısı kontrol ediliyor…</div>
+    </header>
+    <section class="card">
+      <form id="form">
+        <label for="message">Müşteri mesajı</label
+        ><textarea
+          id="message"
+          minlength="5"
+          maxlength="3000"
+          required
+          placeholder="Video yükledim ama ikinci sahnede açılmıyor."
+        ></textarea>
+        <div>
+          <button type="button" class="example">
+            Video yükledim ama ikinci sahnede açılmıyor.</button
+          ><button type="button" class="example">
+            Raporları Excel olarak indirebilir miyiz?
+          </button>
+        </div>
+        <p><button id="submit">Analiz et</button></p>
+      </form>
+      <p id="error" role="alert" hidden></p>
+    </section>
+    <section id="result" hidden aria-live="polite">
+      <div class="grid">
+        <div class="card">
+          <h2>Kategori</h2>
+          <div id="category" class="value"></div>
+        </div>
+        <div class="card">
+          <h2>Konu</h2>
+          <div id="topic" class="value"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Özet</h2>
+        <div id="summary" class="value"></div>
+      </div>
+      <div class="card">
+        <h2>Yanıt taslağı</h2>
+        <div id="reply" class="value"></div>
+        <p>Göndermeden önce taslağı kontrol et.</p>
+      </div>
+    </section>
+  </main>
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const labels = {
+      hata: "Hata bildirimi",
+      ozellik_istegi: "Özellik isteği",
+      soru: "Soru",
+      diger: "Diğer",
+    };
+    async function checkHealth() {
+      try {
+        const r = await fetch("/api/health");
+        if (!r.ok) throw Error();
+        const d = await r.json();
+        $("status").textContent = d.model_ready
+          ? `Hazır · ${d.model}`
+          : d.ollama_available
+            ? `Modeli indir: ollama pull ${d.model}`
+            : "Ollama uygulamasını açarak bağlantıyı başlat.";
+      } catch {
+        $("status").textContent = "Python servisine ulaşılamadı.";
+      }
+    }
+    checkHealth();
+    document.querySelectorAll(".example").forEach(
+      (b) =>
+        (b.onclick = () => {
+          $("message").value = b.textContent;
+          $("message").focus();
+        }),
+    );
+    $("form").onsubmit = async (event) => {
+      event.preventDefault();
+      $("error").hidden = true;
+      $("result").hidden = true;
+      $("submit").disabled = true;
+      $("submit").textContent = "Analiz ediliyor…";
+      try {
+        const r = await fetch("/api/analyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: $("message").value }),
+        });
+        const d = await r.json();
+        if (!r.ok)
+          throw Error(
+            typeof d.detail === "string"
+              ? d.detail
+              : "En az 5 karakterlik bir mesaj girin.",
+          );
+        for (const key of ["category", "topic", "summary", "reply"])
+          $(key).textContent = key === "category" ? labels[d[key]] : d[key];
+        $("result").hidden = false;
+      } catch (e) {
+        $("error").textContent = e.message;
+        $("error").hidden = false;
+      } finally {
+        $("submit").disabled = false;
+        $("submit").textContent = "Analiz et";
+        checkHealth();
+      }
+    };
+  </script>
+</html>
