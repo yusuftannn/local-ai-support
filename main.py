@@ -1,17 +1,29 @@
 import json
 import os
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 ROOT = Path(__file__).parent
 MODEL = os.getenv("OLLAMA_MODEL", "qwen3:1.7b")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
-app = FastAPI(title="AI Talep Analizi", version="0.1.0")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.ollama_client = httpx.AsyncClient()
+    try:
+        yield
+    finally:
+        await app.state.ollama_client.aclose()
+
+
+app = FastAPI(title="AI Talep Analizi", version="0.1.0", lifespan=lifespan)
 
 
 class AnalysisRequest(BaseModel):
@@ -45,19 +57,20 @@ def index():
 
 
 @app.get("/api/health")
-async def health():
+async def health(request: Request):
     try:
-        async with httpx.AsyncClient(timeout=5) as client:
-            response = await client.get(f"{OLLAMA_URL}/api/tags")
-            response.raise_for_status()
-            models = [item["name"] for item in response.json().get("models", [])]
+        response = await request.app.state.ollama_client.get(
+            f"{OLLAMA_URL}/api/tags", timeout=5
+        )
+        response.raise_for_status()
+        models = [item["name"] for item in response.json().get("models", [])]
         return {"ollama_available": True, "model": MODEL, "model_ready": MODEL in models}
     except (httpx.HTTPError, ValueError, KeyError):
         return {"ollama_available": False, "model": MODEL, "model_ready": False}
 
 
 @app.post("/api/analyze", response_model=AnalysisResult)
-async def analyze(body: AnalysisRequest):
+async def analyze(body: AnalysisRequest, request: Request):
     payload = {
         "model": MODEL,
         "messages": [{"role": "system", "content": SYSTEM_PROMPT},
@@ -68,9 +81,10 @@ async def analyze(body: AnalysisRequest):
         "options": {"temperature": 0, "num_predict": 700},
     }
     try:
-        async with httpx.AsyncClient(timeout=180) as client:
-            response = await client.post(f"{OLLAMA_URL}/api/chat", json=payload)
-            response.raise_for_status()
+        response = await request.app.state.ollama_client.post(
+            f"{OLLAMA_URL}/api/chat", json=payload, timeout=180
+        )
+        response.raise_for_status()
     except httpx.TimeoutException as exc:
         raise HTTPException(504, "Model yanıtı gecikti. Daha küçük model deneyin.") from exc
     except httpx.HTTPStatusError as exc:

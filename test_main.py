@@ -12,7 +12,8 @@ def mock_ollama(monkeypatch, status=200, data=None, error=None):
         def __init__(self, **kwargs): pass
         async def __aenter__(self): return self
         async def __aexit__(self, *args): pass
-        async def post(self, url, json):
+        async def aclose(self): pass
+        async def post(self, url, json, timeout=None):
             assert json["stream"] is False
             assert json["format"]["properties"]["category"]
             if error: raise error

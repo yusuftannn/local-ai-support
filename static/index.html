@@ -8,6 +8,10 @@
     * {
       box-sizing: border-box;
     }
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 90px;
+    }
     body {
       margin: 0;
       background: #f4f7fb;
@@ -16,9 +20,80 @@
         16px system-ui,
         sans-serif;
     }
+    .navbar {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: rgba(255, 255, 255, 0.96);
+      border-bottom: 1px solid #dce3ef;
+      backdrop-filter: blur(12px);
+    }
+    .nav-inner {
+      max-width: 1000px;
+      min-height: 68px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: #172238;
+      font-weight: 750;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 9px;
+      background: #315bd3;
+      color: white;
+      font-size: 17px;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-links a {
+      padding: 9px 12px;
+      border-radius: 7px;
+      color: #58667d;
+      font-size: 14px;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .nav-links a:hover,
+    .nav-links a:focus-visible {
+      background: #edf1fa;
+      color: #2946a0;
+    }
+    .nav-links a[aria-disabled="true"] {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+    .skip-link {
+      position: absolute;
+      top: -50px;
+      left: 12px;
+      z-index: 3;
+      padding: 10px 14px;
+      background: white;
+      color: #172238;
+    }
+    .skip-link:focus {
+      top: 8px;
+    }
     main {
       max-width: 900px;
-      margin: 60px auto;
+      margin: 42px auto 60px;
       padding: 24px;
     }
     header {
@@ -89,6 +164,24 @@
       white-space: pre-wrap;
       line-height: 1.6;
     }
+    .result-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .copy-button {
+      flex: 0 0 auto;
+      padding: 7px 11px;
+      background: #edf1fa;
+      color: #29406b;
+      font-size: 13px;
+    }
+    .copy-status {
+      min-height: 20px;
+      margin: 8px 0 0;
+      font-size: 13px;
+    }
     #status {
       font-size: 13px;
     }
@@ -98,9 +191,39 @@
     label {
       font-weight: 600;
     }
+    .character-count {
+      margin: -4px 0 10px;
+      color: #58667d;
+      font-size: 12px;
+      text-align: right;
+    }
+    :focus-visible {
+      outline: 3px solid #82a1ff;
+      outline-offset: 3px;
+    }
     @media (max-width: 600px) {
+      .nav-inner {
+        min-height: 60px;
+        padding: 0 16px;
+      }
+      .brand {
+        gap: 7px;
+        font-size: 14px;
+      }
+      .brand-mark {
+        width: 30px;
+        height: 30px;
+      }
+      .nav-links {
+        gap: 0;
+      }
+      .nav-links a {
+        padding: 8px;
+        font-size: 13px;
+      }
       main {
         margin: 20px auto;
+        padding: 18px;
       }
       .grid {
         grid-template-columns: 1fr;
@@ -110,14 +233,28 @@
       }
     }
   </style>
-  <main>
+  <body>
+    <a class="skip-link" href="#request">İçeriğe geç</a>
+    <nav class="navbar" aria-label="Ana gezinme">
+      <div class="nav-inner">
+        <a class="brand" href="#top" aria-label="AI Talep Analizi ana sayfa">
+          <span class="brand-mark" aria-hidden="true">AI</span>
+          <span>Talep Analizi</span>
+        </a>
+        <div class="nav-links">
+          <a href="#request">Yeni analiz</a>
+          <a id="results-link" href="#results" aria-disabled="true" tabindex="-1">Sonuçlar</a>
+        </div>
+      </div>
+    </nav>
+    <main id="top">
     <header>
       <span class="tag">PYTHON × YAPAY ZEKA</span>
       <h1>Talebi anla. Yanıtı hazırla.</h1>
       <p>Yerel AI modeliyle kategori, konu, özet ve yanıt taslağı oluştur.</p>
       <div id="status" role="status">Model bağlantısı kontrol ediliyor…</div>
     </header>
-    <section class="card">
+    <section class="card" id="request">
       <form id="form">
         <label for="message">Müşteri mesajı</label
         ><textarea
@@ -127,6 +264,7 @@
           required
           placeholder="Video yükledim ama ikinci sahnede açılmıyor."
         ></textarea>
+        <div class="character-count" id="character-count" aria-live="polite">0 / 3000</div>
         <div>
           <button type="button" class="example">
             Video yükledim ama ikinci sahnede açılmıyor.</button
@@ -138,7 +276,7 @@
       </form>
       <p id="error" role="alert" hidden></p>
     </section>
-    <section id="result" hidden aria-live="polite">
+    <section id="results" hidden aria-live="polite">
       <div class="grid">
         <div class="card">
           <h2>Kategori</h2>
@@ -154,12 +292,16 @@
         <div id="summary" class="value"></div>
       </div>
       <div class="card">
-        <h2>Yanıt taslağı</h2>
+        <div class="result-heading">
+          <h2>Yanıt taslağı</h2>
+          <button id="copy-reply" class="copy-button" type="button">Yanıtı kopyala</button>
+        </div>
         <div id="reply" class="value"></div>
+        <p id="copy-status" class="copy-status" role="status" aria-live="polite"></p>
         <p>Göndermeden önce taslağı kontrol et.</p>
       </div>
     </section>
-  </main>
+    </main>
   <script>
     const $ = (id) => document.getElementById(id);
     const labels = {
@@ -183,17 +325,31 @@
       }
     }
     checkHealth();
+    $("message").addEventListener("input", () => {
+      $("character-count").textContent = `${$("message").value.length} / 3000`;
+    });
     document.querySelectorAll(".example").forEach(
       (b) =>
         (b.onclick = () => {
           $("message").value = b.textContent;
+          $("character-count").textContent = `${$("message").value.length} / 3000`;
           $("message").focus();
         }),
     );
+      $("copy-reply").addEventListener("click", async () => {
+        try {
+          await navigator.clipboard.writeText($("reply").textContent);
+          $("copy-status").textContent = "Yanıt panoya kopyalandı.";
+        } catch {
+          $("copy-status").textContent = "Kopyalanamadı. Yanıtı seçip kopyalayın.";
+        }
+      });
     $("form").onsubmit = async (event) => {
       event.preventDefault();
       $("error").hidden = true;
-      $("result").hidden = true;
+      $("results").hidden = true;
+      $("results-link").setAttribute("aria-disabled", "true");
+      $("results-link").tabIndex = -1;
       $("submit").disabled = true;
       $("submit").textContent = "Analiz ediliyor…";
       try {
@@ -211,7 +367,9 @@
           );
         for (const key of ["category", "topic", "summary", "reply"])
           $(key).textContent = key === "category" ? labels[d[key]] : d[key];
-        $("result").hidden = false;
+        $("results").hidden = false;
+        $("results-link").setAttribute("aria-disabled", "false");
+        $("results-link").tabIndex = 0;
       } catch (e) {
         $("error").textContent = e.message;
         $("error").hidden = false;
@@ -222,4 +380,5 @@
       }
     };
   </script>
+  </body>
 </html>
