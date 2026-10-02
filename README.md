@@ -10,7 +10,8 @@ Bu proje, bir müşteri mesajını şu şekilde işler:
 2. Yerel LLM modeliyle analiz eder
 3. Mesajın türünü belirler: hata, özellik isteği, soru veya diğer
 4. Kısa konu ve özet çıkarır
-5. Kullanıcıya uygun bir yanıt taslağı hazırlar
+5. Mesajın etkisine göre düşük, normal veya yüksek öncelik önerir
+6. Kullanıcıya uygun bir yanıt taslağı hazırlar
 
 Amaç, destek taleplerini daha hızlı sınıflandırmak ve operatörlerin iş yükünü hafifletmektir.
 
@@ -20,6 +21,9 @@ Amaç, destek taleplerini daha hızlı sınıflandırmak ve operatörlerin iş y
 - Ollama ile yerel model entegrasyonu
 - Pydantic doğrulaması ile güvenli JSON çıktısı
 - Türkçe müşteri mesajlarına özel analiz akışı
+- Mesaj etkisine göre LLM tabanlı öncelik önerisi
+- Operatör düzeltmeleriyle yerel etiketli veri toplama ve CSV dışa aktarma
+- Geri bildirimlerden kategori ve öncelik uyumunu ölçme
 - Web arayüzü ile hızlı test imkanı
 - Hata, timeout, eksik model ve kötü JSON yanıtlarını yönetme
 
@@ -35,6 +39,7 @@ Model, sadece belirlenen şema içinde dönüt üretir:
 - topic
 - summary
 - reply
+- priority
 
 Bu yaklaşım, uygulamanın çıktısını tahmin edilebilir ve kullanılabilir hale getirir.
 
@@ -52,6 +57,7 @@ Bu yaklaşım, uygulamanın çıktısını tahmin edilebilir ve kullanılabilir 
 - `main.py` — FastAPI uygulaması, model çağrısı ve veri doğrulama
 - `static/index.html` — arayüz ve istemci tarafı örnek kullanım
 - `test_main.py` — API davranışlarını test eden senaryolar
+- `feedback.sqlite3` — operatör onayıyla yerel olarak saklanan etiketli talepler
 - `requirements.txt` — proje bağımlılıkları
 
 ## Çalıştırma
@@ -74,4 +80,6 @@ Sonrasında tarayıcıdan uygulamaya erişilebilir:
 
 - Bu proje, gerçek üretim seviyesi bir destek sistemi değil; öğrenme ve prototip geliştirme amacı taşır.
 - Model yanıtları her zaman doğru olmayabilir; kullanıcı onayı ve kontroller önemlidir.
+- Geri bildirim kaydı yalnızca onay kutusu işaretlendiğinde yapılır. Talep metinleri bu bilgisayardaki SQLite veritabanında saklanır; hassas veya kişisel verileri kaydetmeyin.
+- Gösterilen uyum oranları, operatörün değerlendirdiği kayıtlar üzerindeki oranlardır; tüm taleplere genellenmiş doğruluk garantisi değildir.
 - Amaç, iş akışını göstermek ve kişisel veya küçük ölçekli otomasyon için temel bir yapı sunmaktır.

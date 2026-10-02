@@ -152,8 +152,68 @@
     }
     .grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 15px;
+    }
+    .priority {
+      display: inline-block;
+      padding: 5px 9px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+    .priority[data-level="yuksek"] {
+      background: #fde8e7;
+      color: #a32032;
+    }
+    .priority[data-level="normal"] {
+      background: #fff2d7;
+      color: #765000;
+    }
+    .priority[data-level="dusuk"] {
+      background: #e5f3e9;
+      color: #24613a;
+    }
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 15px;
+      margin-top: 16px;
+    }
+    .stat-value {
+      color: #172238;
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .feedback-form {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      align-items: end;
+      gap: 12px;
+    }
+    .feedback-form select {
+      width: 100%;
+      margin-top: 6px;
+      padding: 10px;
+      border: 1px solid #b6c3d6;
+      border-radius: 6px;
+      background: white;
+      color: inherit;
+      font: inherit;
+    }
+    .consent {
+      display: flex;
+      align-items: flex-start;
+      gap: 9px;
+      margin: 16px 0;
+      font-weight: 400;
+    }
+    .consent input {
+      margin-top: 5px;
+    }
+    #feedback-status {
+      min-height: 20px;
+      margin-bottom: 0;
     }
     h2 {
       font-size: 14px;
@@ -228,6 +288,10 @@
       .grid {
         grid-template-columns: 1fr;
       }
+      .stats-grid,
+      .feedback-form {
+        grid-template-columns: 1fr;
+      }
       h1 {
         font-size: 28px;
       }
@@ -254,6 +318,18 @@
       <p>Yerel AI modeliyle kategori, konu, özet ve yanıt taslağı oluştur.</p>
       <div id="status" role="status">Model bağlantısı kontrol ediliyor…</div>
     </header>
+    <section class="card" id="evaluation" aria-labelledby="evaluation-title">
+      <div class="result-heading">
+        <h2 id="evaluation-title">Model değerlendirmesi</h2>
+        <a id="export-feedback" href="/api/feedback/export" download hidden>Etiketleri CSV indir</a>
+      </div>
+      <p id="evaluation-empty">Henüz değerlendirilen talep yok.</p>
+      <div class="stats-grid" id="evaluation-stats" hidden>
+        <div><h2>Değerlendirilen</h2><div id="evaluated-count" class="stat-value"></div></div>
+        <div><h2>Kategori uyumu</h2><div id="category-accuracy" class="stat-value"></div></div>
+        <div><h2>Öncelik uyumu</h2><div id="priority-accuracy" class="stat-value"></div></div>
+      </div>
+    </section>
     <section class="card" id="request">
       <form id="form">
         <label for="message">Müşteri mesajı</label
@@ -279,6 +355,10 @@
     <section id="results" hidden aria-live="polite">
       <div class="grid">
         <div class="card">
+          <h2>Öncelik</h2>
+          <div id="priority" class="priority"></div>
+        </div>
+        <div class="card">
           <h2>Kategori</h2>
           <div id="category" class="value"></div>
         </div>
@@ -300,6 +380,35 @@
         <p id="copy-status" class="copy-status" role="status" aria-live="polite"></p>
         <p>Göndermeden önce taslağı kontrol et.</p>
       </div>
+      <section class="card" aria-labelledby="feedback-title">
+        <h2 id="feedback-title">Model tahminini değerlendir</h2>
+        <p>Seçtiğiniz etiketler ve talep metni bu cihazda yerel olarak saklanır.</p>
+        <form id="feedback-form">
+          <div class="feedback-form">
+            <label for="corrected-category">Doğru kategori
+              <select id="corrected-category">
+                <option value="hata">Hata bildirimi</option>
+                <option value="ozellik_istegi">Özellik isteği</option>
+                <option value="soru">Soru</option>
+                <option value="diger">Diğer</option>
+              </select>
+            </label>
+            <label for="corrected-priority">Doğru öncelik
+              <select id="corrected-priority">
+                <option value="dusuk">Düşük</option>
+                <option value="normal">Normal</option>
+                <option value="yuksek">Yüksek</option>
+              </select>
+            </label>
+            <button id="save-feedback" type="submit" disabled>Değerlendirmeyi kaydet</button>
+          </div>
+          <label class="consent" for="feedback-consent">
+            <input id="feedback-consent" type="checkbox" />
+            Bu talep metninin ve etiketlerin yerel değerlendirme verisine kaydedilmesini onaylıyorum.
+          </label>
+        </form>
+        <p id="feedback-status" role="status" aria-live="polite"></p>
+      </section>
     </section>
     </main>
   <script>
@@ -310,6 +419,27 @@
       soru: "Soru",
       diger: "Diğer",
     };
+    const priorityLabels = { dusuk: "Düşük", normal: "Normal", yuksek: "Yüksek" };
+    let currentAnalysis = null;
+    async function loadEvaluation() {
+      try {
+        const response = await fetch("/api/feedback/metrics");
+        if (!response.ok) throw Error();
+        const metrics = await response.json();
+        const hasFeedback = metrics.evaluated_count > 0;
+        $("evaluation-empty").hidden = hasFeedback;
+        $("evaluation-stats").hidden = !hasFeedback;
+        $("export-feedback").hidden = !hasFeedback;
+        if (hasFeedback) {
+          $("evaluated-count").textContent = metrics.evaluated_count;
+          $("category-accuracy").textContent = `${(metrics.category_accuracy * 100).toFixed(1)}%`;
+          $("priority-accuracy").textContent = `${(metrics.priority_accuracy * 100).toFixed(1)}%`;
+        }
+      } catch {
+        $("evaluation-empty").textContent = "Değerlendirme verisine ulaşılamadı.";
+      }
+    }
+    loadEvaluation();
     async function checkHealth() {
       try {
         const r = await fetch("/api/health");
@@ -348,6 +478,7 @@
       event.preventDefault();
       $("error").hidden = true;
       $("results").hidden = true;
+      currentAnalysis = null;
       $("results-link").setAttribute("aria-disabled", "true");
       $("results-link").tabIndex = -1;
       $("submit").disabled = true;
@@ -366,7 +497,16 @@
               : "En az 5 karakterlik bir mesaj girin.",
           );
         for (const key of ["category", "topic", "summary", "reply"])
+        for (const key of ["category", "topic", "summary", "reply"])
           $(key).textContent = key === "category" ? labels[d[key]] : d[key];
+        $("priority").textContent = priorityLabels[d.priority];
+        $("priority").dataset.level = d.priority;
+        currentAnalysis = { ...d, message: $("message").value };
+        $("corrected-category").value = d.category;
+        $("corrected-priority").value = d.priority;
+        $("feedback-consent").checked = false;
+        $("save-feedback").disabled = true;
+        $("feedback-status").textContent = "";
         $("results").hidden = false;
         $("results-link").setAttribute("aria-disabled", "false");
         $("results-link").tabIndex = 0;
@@ -379,6 +519,35 @@
         checkHealth();
       }
     };
+    $("feedback-consent").addEventListener("change", () => {
+      $("save-feedback").disabled = !$("feedback-consent").checked;
+    });
+    $("feedback-form").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      if (!currentAnalysis || !$("feedback-consent").checked) return;
+      $("save-feedback").disabled = true;
+      $("feedback-status").textContent = "Kaydediliyor…";
+      try {
+        const response = await fetch("/api/feedback", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: currentAnalysis.message,
+            predicted_category: currentAnalysis.category,
+            corrected_category: $("corrected-category").value,
+            predicted_priority: currentAnalysis.priority,
+            corrected_priority: $("corrected-priority").value,
+          }),
+        });
+        if (!response.ok) throw Error();
+        $("feedback-status").textContent = "Değerlendirme yerel olarak kaydedildi.";
+        $("feedback-consent").checked = false;
+        loadEvaluation();
+      } catch {
+        $("feedback-status").textContent = "Kayıt yapılamadı. Tekrar deneyin.";
+        $("save-feedback").disabled = !$("feedback-consent").checked;
+      }
+    });
   </script>
   </body>
 </html>
