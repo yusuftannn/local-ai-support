@@ -23,7 +23,12 @@ def mock_ollama(monkeypatch, status=200, data=None, error=None):
 
 
 def test_page():
-    assert client.get("/").status_code == 200
+    response = client.get("/")
+    assert response.status_code == 200
+    assert 'class="sidebar" id="sidebar"' in response.text
+    assert 'href="#request"' in response.text
+    assert 'href="#evaluation"' in response.text
+    assert 'href="#results"' in response.text
 
 
 def test_success(monkeypatch):

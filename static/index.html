@@ -20,23 +20,16 @@
         16px system-ui,
         sans-serif;
     }
-    .navbar {
-      position: sticky;
-      top: 0;
-      z-index: 2;
-      background: rgba(255, 255, 255, 0.96);
-      border-bottom: 1px solid #dce3ef;
-      backdrop-filter: blur(12px);
-    }
-    .nav-inner {
-      max-width: 1000px;
-      min-height: 68px;
-      margin: 0 auto;
-      padding: 0 24px;
+    .sidebar {
+      position: fixed;
+      inset: 0 auto 0 0;
+      z-index: 4;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 20px;
+      width: 256px;
+      flex-direction: column;
+      padding: 28px 18px 20px;
+      background: #fff;
+      border-right: 1px solid #dce3ef;
     }
     .brand {
       display: inline-flex;
@@ -46,6 +39,7 @@
       font-weight: 750;
       text-decoration: none;
       white-space: nowrap;
+      padding: 0 8px;
     }
     .brand-mark {
       display: grid;
@@ -57,27 +51,80 @@
       color: white;
       font-size: 17px;
     }
+    .sidebar-label {
+      margin: 40px 10px 10px;
+      color: #8894a8;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+    }
     .nav-links {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      display: grid;
+      gap: 5px;
     }
     .nav-links a {
-      padding: 9px 12px;
-      border-radius: 7px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 11px 12px;
+      border-radius: 9px;
       color: #58667d;
       font-size: 14px;
       font-weight: 600;
       text-decoration: none;
+      transition: background 140ms ease, color 140ms ease;
     }
     .nav-links a:hover,
-    .nav-links a:focus-visible {
+    .nav-links a:focus-visible,
+    .nav-links a[aria-current="location"] {
       background: #edf1fa;
       color: #2946a0;
+    }
+    .nav-icon {
+      width: 20px;
+      color: #77849a;
+      font-size: 17px;
+      text-align: center;
+    }
+    .nav-links a[aria-current="location"] .nav-icon {
+      color: #315bd3;
     }
     .nav-links a[aria-disabled="true"] {
       opacity: 0.45;
       pointer-events: none;
+    }
+    .sidebar-note {
+      margin-top: auto;
+      padding: 15px;
+      border: 1px solid #e1e8f5;
+      border-radius: 12px;
+      background: #f7f9fd;
+    }
+    .sidebar-note strong {
+      display: block;
+      margin-bottom: 5px;
+      color: #2946a0;
+      font-size: 13px;
+    }
+    .sidebar-note p {
+      margin: 0;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .sidebar-docs {
+      display: block;
+      margin: 16px 10px 0;
+      color: #58667d;
+      font-size: 13px;
+      text-decoration: none;
+    }
+    .sidebar-docs:hover {
+      color: #2946a0;
+    }
+    .mobile-menu-button,
+    .sidebar-overlay {
+      display: none;
     }
     .skip-link {
       position: absolute;
@@ -95,6 +142,45 @@
       max-width: 900px;
       margin: 42px auto 60px;
       padding: 24px;
+      margin-left: max(280px, calc((100vw - 900px + 256px) / 2));
+      margin-right: auto;
+    }
+    .overview-grid {
+      display: grid;
+      grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.3fr);
+      align-items: start;
+      gap: 16px;
+    }
+    .overview-grid .card {
+      height: 100%;
+      margin-bottom: 0;
+      padding: 20px;
+    }
+    .overview-grid .stats-grid {
+      grid-template-columns: 1fr;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .overview-grid .stat-value {
+      font-size: 18px;
+    }
+    .overview-grid textarea {
+      min-height: 120px;
+    }
+    .page-header {
+      position: relative;
+    }
+    .mobile-menu-button {
+      align-items: center;
+      justify-content: center;
+      width: 42px;
+      height: 42px;
+      margin-bottom: 20px;
+      padding: 0;
+      background: white;
+      border: 1px solid #dce3ef;
+      color: #172238;
+      font-size: 20px;
     }
     header {
       margin-bottom: 28px;
@@ -261,29 +347,38 @@
       outline: 3px solid #82a1ff;
       outline-offset: 3px;
     }
-    @media (max-width: 600px) {
-      .nav-inner {
-        min-height: 60px;
-        padding: 0 16px;
+    @media (max-width: 800px) {
+      .sidebar {
+        width: min(290px, calc(100vw - 52px));
+        box-shadow: 16px 0 40px rgba(23, 34, 56, 0.12);
+        transform: translateX(-105%);
+        transition: transform 180ms ease;
       }
-      .brand {
-        gap: 7px;
-        font-size: 14px;
+      body.sidebar-open .sidebar {
+        transform: translateX(0);
       }
-      .brand-mark {
-        width: 30px;
-        height: 30px;
+      .sidebar-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 3;
+        display: block;
+        background: rgba(23, 34, 56, 0.38);
       }
-      .nav-links {
-        gap: 0;
+      .sidebar-overlay[hidden] {
+        display: none;
       }
-      .nav-links a {
-        padding: 8px;
-        font-size: 13px;
+      .mobile-menu-button {
+        display: inline-flex;
       }
       main {
         margin: 20px auto;
         padding: 18px;
+      }
+      .overview-grid {
+        grid-template-columns: 1fr;
+      }
+      .overview-grid .card {
+        height: auto;
       }
       .grid {
         grid-template-columns: 1fr;
@@ -296,62 +391,92 @@
         font-size: 28px;
       }
     }
+    @media (min-width: 801px) {
+      main {
+        min-height: 100vh;
+        margin-top: 0;
+        margin-bottom: 0;
+        padding-top: clamp(20px, 5vh, 42px);
+        padding-bottom: 24px;
+      }
+      .sidebar-overlay {
+        display: none !important;
+      }
+    }
   </style>
   <body>
     <a class="skip-link" href="#request">İçeriğe geç</a>
-    <nav class="navbar" aria-label="Ana gezinme">
-      <div class="nav-inner">
-        <a class="brand" href="#top" aria-label="AI Talep Analizi ana sayfa">
-          <span class="brand-mark" aria-hidden="true">AI</span>
-          <span>Talep Analizi</span>
+    <aside class="sidebar" id="sidebar">
+      <a class="brand" href="#top" aria-label="AI Talep Analizi ana sayfa">
+        <span class="brand-mark" aria-hidden="true">AI</span>
+        <span>Talep Analizi</span>
+      </a>
+      <p class="sidebar-label">Çalışma alanı</p>
+      <nav class="nav-links" aria-label="Ana gezinme">
+        <a href="#top" aria-current="location">
+          <span class="nav-icon" aria-hidden="true">⌂</span>Genel bakış
         </a>
-        <div class="nav-links">
-          <a href="#request">Yeni analiz</a>
-          <a id="results-link" href="#results" aria-disabled="true" tabindex="-1">Sonuçlar</a>
-        </div>
+        <a href="#request">
+          <span class="nav-icon" aria-hidden="true">＋</span>Yeni talep analizi
+        </a>
+        <a id="results-link" href="#results" aria-disabled="true" tabindex="-1">
+          <span class="nav-icon" aria-hidden="true">▤</span>Analiz sonuçları
+        </a>
+        <a href="#evaluation">
+          <span class="nav-icon" aria-hidden="true">◷</span>Model değerlendirmesi
+        </a>
+      </nav>
+      <div class="sidebar-note">
+        <strong>Yerel ve gizli</strong>
+        <p>Talepler, analiz için bilgisayarınızdaki yerel AI modeline gönderilir.</p>
       </div>
-    </nav>
+      <a class="sidebar-docs" href="/docs">API dokümantasyonu ↗</a>
+    </aside>
+    <button class="sidebar-overlay" id="sidebar-overlay" type="button" aria-label="Menüyü kapat" hidden></button>
     <main id="top">
-    <header>
+    <header class="page-header">
+      <button class="mobile-menu-button" id="menu-toggle" type="button" aria-label="Menüyü aç" aria-expanded="false" aria-controls="sidebar">☰</button>
       <span class="tag">PYTHON × YAPAY ZEKA</span>
       <h1>Talebi anla. Yanıtı hazırla.</h1>
       <p>Yerel AI modeliyle kategori, konu, özet ve yanıt taslağı oluştur.</p>
       <div id="status" role="status">Model bağlantısı kontrol ediliyor…</div>
     </header>
-    <section class="card" id="evaluation" aria-labelledby="evaluation-title">
-      <div class="result-heading">
-        <h2 id="evaluation-title">Model değerlendirmesi</h2>
-        <a id="export-feedback" href="/api/feedback/export" download hidden>Etiketleri CSV indir</a>
-      </div>
-      <p id="evaluation-empty">Henüz değerlendirilen talep yok.</p>
-      <div class="stats-grid" id="evaluation-stats" hidden>
-        <div><h2>Değerlendirilen</h2><div id="evaluated-count" class="stat-value"></div></div>
-        <div><h2>Kategori uyumu</h2><div id="category-accuracy" class="stat-value"></div></div>
-        <div><h2>Öncelik uyumu</h2><div id="priority-accuracy" class="stat-value"></div></div>
-      </div>
-    </section>
-    <section class="card" id="request">
-      <form id="form">
-        <label for="message">Müşteri mesajı</label
-        ><textarea
-          id="message"
-          minlength="5"
-          maxlength="3000"
-          required
-          placeholder="Video yükledim ama ikinci sahnede açılmıyor."
-        ></textarea>
-        <div class="character-count" id="character-count" aria-live="polite">0 / 3000</div>
-        <div>
-          <button type="button" class="example">
-            Video yükledim ama ikinci sahnede açılmıyor.</button
-          ><button type="button" class="example">
-            Raporları Excel olarak indirebilir miyiz?
-          </button>
+    <div class="overview-grid">
+      <section class="card" id="evaluation" aria-labelledby="evaluation-title">
+        <div class="result-heading">
+          <h2 id="evaluation-title">Model değerlendirmesi</h2>
+          <a id="export-feedback" href="/api/feedback/export" download hidden>CSV indir</a>
         </div>
-        <p><button id="submit">Analiz et</button></p>
-      </form>
-      <p id="error" role="alert" hidden></p>
-    </section>
+        <p id="evaluation-empty">Henüz değerlendirilen talep yok.</p>
+        <div class="stats-grid" id="evaluation-stats" hidden>
+          <div><h2>Değerlendirilen</h2><div id="evaluated-count" class="stat-value"></div></div>
+          <div><h2>Kategori uyumu</h2><div id="category-accuracy" class="stat-value"></div></div>
+          <div><h2>Öncelik uyumu</h2><div id="priority-accuracy" class="stat-value"></div></div>
+        </div>
+      </section>
+      <section class="card" id="request">
+        <form id="form">
+          <label for="message">Müşteri mesajı</label
+          ><textarea
+            id="message"
+            minlength="5"
+            maxlength="3000"
+            required
+            placeholder="Video yükledim ama ikinci sahnede açılmıyor."
+          ></textarea>
+          <div class="character-count" id="character-count" aria-live="polite">0 / 3000</div>
+          <div>
+            <button type="button" class="example">
+              Video yükledim ama ikinci sahnede açılmıyor.</button
+            ><button type="button" class="example">
+              Raporları Excel olarak indirebilir miyiz?
+            </button>
+          </div>
+          <p><button id="submit">Analiz et</button></p>
+        </form>
+        <p id="error" role="alert" hidden></p>
+      </section>
+    </div>
     <section id="results" hidden aria-live="polite">
       <div class="grid">
         <div class="card">
@@ -413,6 +538,41 @@
     </main>
   <script>
     const $ = (id) => document.getElementById(id);
+    const sidebar = $("sidebar");
+    const menuToggle = $("menu-toggle");
+    const sidebarOverlay = $("sidebar-overlay");
+    const navLinks = [...document.querySelectorAll(".nav-links a")];
+    function closeSidebar() {
+      document.body.classList.remove("sidebar-open");
+      menuToggle.setAttribute("aria-expanded", "false");
+      menuToggle.setAttribute("aria-label", "Menüyü aç");
+      sidebarOverlay.hidden = true;
+    }
+    menuToggle.addEventListener("click", () => {
+      const isOpen = document.body.classList.toggle("sidebar-open");
+      menuToggle.setAttribute("aria-expanded", String(isOpen));
+      menuToggle.setAttribute("aria-label", isOpen ? "Menüyü kapat" : "Menüyü aç");
+      sidebarOverlay.hidden = !isOpen;
+    });
+    sidebarOverlay.addEventListener("click", closeSidebar);
+    sidebar.addEventListener("click", (event) => {
+      if (event.target.closest(".nav-links a")) closeSidebar();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") closeSidebar();
+    });
+    function updateActiveLink() {
+      const currentHash = window.location.hash || "#top";
+      navLinks.forEach((link) => {
+        if (link.getAttribute("href") === currentHash) {
+          link.setAttribute("aria-current", "location");
+        } else {
+          link.removeAttribute("aria-current");
+        }
+      });
+    }
+    window.addEventListener("hashchange", updateActiveLink);
+    updateActiveLink();
     const labels = {
       hata: "Hata bildirimi",
       ozellik_istegi: "Özellik isteği",
