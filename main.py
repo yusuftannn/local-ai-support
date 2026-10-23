@@ -80,6 +80,16 @@ def index():
     return FileResponse(ROOT / "static" / "index.html")
 
 
+@app.get("/dashboard", include_in_schema=False)
+def dashboard():
+    return FileResponse(ROOT / "static" / "dashboard.html")
+
+
+@app.get("/history", include_in_schema=False)
+def history():
+    return FileResponse(ROOT / "static" / "history.html")
+
+
 @app.get("/api/health")
 async def health(request: Request):
     try:
@@ -137,6 +147,34 @@ def open_feedback_db():
         created_at TEXT NOT NULL
     )""")
     return connection
+
+
+@app.get("/api/feedback")
+def list_feedback(limit: int = 10):
+    if limit < 1:
+        raise HTTPException(400, "limit en az 1 olmalıdır.")
+    with closing(open_feedback_db()) as connection:
+        rows = connection.execute(
+            """SELECT
+                message, model, predicted_category, corrected_category,
+                predicted_priority, corrected_priority, created_at
+                FROM feedback ORDER BY id DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    return {
+        "items": [
+            {
+                "message": row["message"],
+                "model": row["model"],
+                "predicted_category": row["predicted_category"],
+                "corrected_category": row["corrected_category"],
+                "predicted_priority": row["predicted_priority"],
+                "corrected_priority": row["corrected_priority"],
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
+    }
 
 
 @app.post("/api/feedback", status_code=201)

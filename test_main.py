@@ -31,6 +31,15 @@ def test_page():
     assert 'href="#results"' in response.text
 
 
+def test_additional_pages():
+    dashboard = client.get("/dashboard")
+    history = client.get("/history")
+    assert dashboard.status_code == 200
+    assert history.status_code == 200
+    assert 'Yönetim Paneli' in dashboard.text
+    assert 'Geçmiş değerlendirmeler' in history.text
+
+
 def test_success(monkeypatch):
     import json
     mock_ollama(monkeypatch, data={"message": {"content": json.dumps(RESULT)}})
@@ -71,6 +80,10 @@ def test_feedback_metrics_and_export(monkeypatch, tmp_path):
     saved = client.post("/api/feedback", json=feedback)
     assert saved.status_code == 201
     assert saved.json() == {"saved": True}
+
+    listed = client.get("/api/feedback").json()
+    assert len(listed["items"]) == 1
+    assert listed["items"][0]["message"] == feedback["message"]
 
     metrics = client.get("/api/feedback/metrics").json()
     assert metrics == {
