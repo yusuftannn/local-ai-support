@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Literal
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
@@ -150,18 +150,38 @@ def open_feedback_db():
 
 
 @app.get("/api/feedback")
-def list_feedback(limit: int = 10):
-    if limit < 1:
-        raise HTTPException(400, "limit en az 1 olmalıdır.")
+def list_feedback(
+    limit: int = Query(default=10, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
+    search: str = Query(default="", max_length=200),
+    category: Literal["hata", "ozellik_istegi", "soru", "diger"] | None = None,
+    priority: Literal["dusuk", "normal", "yuksek"] | None = None,
+):
+    conditions = []
+    parameters = []
+    if search.strip():
+        conditions.append("message LIKE ? COLLATE NOCASE")
+        parameters.append(f"%{search.strip()}%")
+    if category is not None:
+        conditions.append("corrected_category = ?")
+        parameters.append(category)
+    if priority is not None:
+        conditions.append("corrected_priority = ?")
+        parameters.append(priority)
+    where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
     with closing(open_feedback_db()) as connection:
+        total = connection.execute(
+            f"SELECT COUNT(*) FROM feedback {where_clause}", parameters
+        ).fetchone()[0]
         rows = connection.execute(
-            """SELECT
+            f"""SELECT
                 message, model, predicted_category, corrected_category,
                 predicted_priority, corrected_priority, created_at
-                FROM feedback ORDER BY id DESC LIMIT ?""",
-            (limit,),
+                FROM feedback {where_clause} ORDER BY id DESC LIMIT ? OFFSET ?""",
+            (*parameters, limit, offset),
         ).fetchall()
     return {
+        "total": total,
         "items": [
             {
                 "message": row["message"],
@@ -209,12 +229,24 @@ def feedback_metrics():
             SUM(predicted_category = corrected_category
                 AND predicted_priority = corrected_priority) AS exact_correct
             FROM feedback WHERE model = ?""", (MODEL,)).fetchone()
+        category_rows = connection.execute(
+                """SELECT corrected_category, COUNT(*) AS count FROM feedback
+                WHERE model = ? GROUP BY corrected_category""",
+                (MODEL,),
+        ).fetchall()
+        priority_rows = connection.execute(
+                """SELECT corrected_priority, COUNT(*) AS count FROM feedback
+                WHERE model = ? GROUP BY corrected_priority""",
+                (MODEL,),
+        ).fetchall()
     total = row["total"]
     return {
         "evaluated_count": total,
         "category_accuracy": row["category_correct"] / total if total else None,
         "priority_accuracy": row["priority_correct"] / total if total else None,
         "exact_match_accuracy": row["exact_correct"] / total if total else None,
+        "category_counts": {item["corrected_category"]: item["count"] for item in category_rows},
+        "priority_counts": {item["corrected_priority"]: item["count"] for item in priority_rows},
     }
 
 

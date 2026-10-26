@@ -91,12 +91,45 @@ def test_feedback_metrics_and_export(monkeypatch, tmp_path):
         "category_accuracy": 0,
         "priority_accuracy": 0,
         "exact_match_accuracy": 0,
+        "category_counts": {"hata": 1},
+        "priority_counts": {"yuksek": 1},
     }
 
     exported = client.get("/api/feedback/export")
     rows = list(csv.reader(io.StringIO(exported.text.lstrip("\ufeff"))))
     assert rows[1][0] == "'=1+1 şeklinde hata oluşuyor."
     assert rows[1][3] == "hata"
+
+
+def test_feedback_search_filters_and_pagination(monkeypatch, tmp_path):
+    monkeypatch.setattr(main, "FEEDBACK_DB", tmp_path / "feedback.sqlite3")
+    entries = [
+        ("Excel raporu nasıl alınır?", "soru", "dusuk"),
+        ("Excel dışa aktarma özelliği", "ozellik_istegi", "dusuk"),
+        ("Video yükleme hatası", "hata", "yuksek"),
+    ]
+    for message, category, priority in entries:
+        response = client.post("/api/feedback", json={
+            "message": message,
+            "predicted_category": category,
+            "corrected_category": category,
+            "predicted_priority": priority,
+            "corrected_priority": priority,
+        })
+        assert response.status_code == 201
+
+    filtered = client.get(
+        "/api/feedback",
+        params={"search": "EXCEL", "category": "ozellik_istegi", "priority": "dusuk"},
+    ).json()
+    assert filtered["total"] == 1
+    assert filtered["items"][0]["message"] == "Excel dışa aktarma özelliği"
+
+    page = client.get("/api/feedback", params={"limit": 1, "offset": 1}).json()
+    assert page["total"] == 3
+    assert len(page["items"]) == 1
+    assert page["items"][0]["message"] == "Excel dışa aktarma özelliği"
+    assert client.get("/api/feedback", params={"limit": 101}).status_code == 422
 
 
 @pytest.mark.parametrize("status,error,expected", [

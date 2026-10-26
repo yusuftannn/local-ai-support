@@ -100,6 +100,51 @@
         gap: 12px;
         margin: 16px 0;
       }
+      .filters {
+        display: grid;
+        grid-template-columns: minmax(220px, 2fr) repeat(2, minmax(160px, 1fr));
+        gap: 12px;
+        margin: 20px 0;
+      }
+      .filters label {
+        display: grid;
+        gap: 6px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .filters input, .filters select {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--stroke);
+        border-radius: 10px;
+        background: white;
+        color: var(--text);
+        font: inherit;
+      }
+      .pager {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .pager button {
+        padding: 8px 12px;
+        border: 1px solid var(--stroke);
+        border-radius: 9px;
+        background: white;
+        color: var(--text);
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .pager button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+      :focus-visible {
+        outline: 3px solid #82a1ff;
+        outline-offset: 2px;
+      }
       table {
         width: 100%;
         border-collapse: collapse;
@@ -138,6 +183,7 @@
         padding: 24px;
       }
       @media (max-width: 780px) {
+        .filters { grid-template-columns: 1fr; }
         table, thead, tbody, th, td, tr { display: block; }
         thead { display: none; }
         tr { border-bottom: 1px solid var(--stroke); }
@@ -165,8 +211,36 @@
         <p class="muted">Bu cihazdaki yerel kayıtlar ve yapılan düzeltmeler burada görünür.</p>
       </section>
 
+      <form class="filters" id="filters">
+        <label for="search">Mesajlarda ara
+          <input id="search" type="search" maxlength="200" placeholder="Örn. video, rapor" />
+        </label>
+        <label for="category">Düzeltilmiş kategori
+          <select id="category">
+            <option value="">Tüm kategoriler</option>
+            <option value="hata">Hata bildirimi</option>
+            <option value="ozellik_istegi">Özellik isteği</option>
+            <option value="soru">Soru</option>
+            <option value="diger">Diğer</option>
+          </select>
+        </label>
+        <label for="priority">Düzeltilmiş öncelik
+          <select id="priority">
+            <option value="">Tüm öncelikler</option>
+            <option value="yuksek">Yüksek</option>
+            <option value="normal">Normal</option>
+            <option value="dusuk">Düşük</option>
+          </select>
+        </label>
+      </form>
+
       <div class="toolbar">
-        <span class="pill" id="row-count">0 kayıt</span>
+        <span class="pill" id="row-count" aria-live="polite">Kayıtlar yükleniyor…</span>
+        <div class="pager">
+          <button id="previous-page" type="button" disabled>Önceki</button>
+          <span class="muted" id="page-number">—</span>
+          <button id="next-page" type="button" disabled>Sonraki</button>
+        </div>
         <a class="primary-btn" href="/api/feedback/export" download>CSV dışa aktar</a>
       </div>
 
@@ -174,49 +248,130 @@
     </div>
 
     <script>
+      const pageSize = 20;
+      let offset = 0;
+      let searchTimer;
+      const labels = {
+        hata: 'Hata bildirimi',
+        ozellik_istegi: 'Özellik isteği',
+        soru: 'Soru',
+        diger: 'Diğer',
+        dusuk: 'Düşük',
+        normal: 'Normal',
+        yuksek: 'Yüksek',
+      };
+
+      function addCell(row, value, className) {
+        const cell = document.createElement('td');
+        cell.textContent = value;
+        if (className) cell.className = className;
+        row.appendChild(cell);
+      }
+
+      function renderHistory(items) {
+        const root = document.getElementById('history-root');
+        root.replaceChildren();
+        if (!items.length) {
+          const empty = document.createElement('div');
+          empty.className = 'empty';
+          const heading = document.createElement('strong');
+          const hasFilters = document.getElementById('search').value.trim()
+            || document.getElementById('category').value
+            || document.getElementById('priority').value;
+          heading.textContent = hasFilters ? 'Eşleşen kayıt bulunamadı.' : 'Henüz kayıt yok.';
+          const detail = document.createElement('p');
+          detail.className = 'muted';
+          detail.textContent = hasFilters
+            ? 'Arama veya filtreleri değiştirip yeniden deneyin.'
+            : 'İlk değerlendirmeyi ana sayfadaki formdan kaydedebilirsiniz.';
+          empty.append(heading, detail);
+          root.appendChild(empty);
+          return;
+        }
+
+        const table = document.createElement('table');
+        table.innerHTML = '<thead><tr><th>Tarih</th><th>Mesaj</th><th>Model tahmini</th><th>Doğru etiket</th><th>Öncelik</th></tr></thead>';
+        const body = document.createElement('tbody');
+        items.forEach(item => {
+          const row = document.createElement('tr');
+          const createdAt = new Date(item.created_at);
+          addCell(row, Number.isNaN(createdAt.getTime())
+            ? item.created_at
+            : createdAt.toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' }));
+          const message = item.message || '';
+          addCell(row, `${message.slice(0, 180)}${message.length > 180 ? '…' : ''}`);
+          addCell(row, `${labels[item.predicted_category] || item.predicted_category} / ${labels[item.predicted_priority] || item.predicted_priority}`);
+          addCell(row, `${labels[item.corrected_category] || item.corrected_category} / ${labels[item.corrected_priority] || item.corrected_priority}`);
+          addCell(row, labels[item.corrected_priority] || item.corrected_priority, 'pill');
+          body.appendChild(row);
+        });
+        table.appendChild(body);
+        root.appendChild(table);
+      }
+
       async function loadHistory() {
         const root = document.getElementById('history-root');
+        const params = new URLSearchParams({
+          limit: String(pageSize),
+          offset: String(offset),
+          search: document.getElementById('search').value.trim(),
+        });
+        const category = document.getElementById('category').value;
+        const priority = document.getElementById('priority').value;
+        if (category) params.set('category', category);
+        if (priority) params.set('priority', priority);
         try {
-          const response = await fetch('/api/feedback?limit=20');
+          const response = await fetch(`/api/feedback?${params}`);
           if (!response.ok) throw new Error('History unavailable');
           const payload = await response.json();
-          const items = payload.items || [];
-          document.getElementById('row-count').textContent = `${items.length} kayıt`;
-
-          if (!items.length) {
-            root.innerHTML = '<div class="empty"><strong>Henüz kayıt yok.</strong><p class="muted">İlk değerlendirmeyi ana sayfadaki formdan kaydetmeniz gerekiyor.</p></div>';
-            return;
-          }
-
-          root.innerHTML = `
-            <table>
-              <thead>
-                <tr>
-                  <th>Tarih</th>
-                  <th>Mesaj</th>
-                  <th>Model tahmini</th>
-                  <th>Doğru etiket</th>
-                  <th>Öncelik</th>
-                </tr>
-              </thead>
-              <tbody>
-                ${items.map(item => `
-                  <tr>
-                    <td>${new Date(item.created_at).toLocaleString('tr-TR', { dateStyle: 'short', timeStyle: 'short' })}</td>
-                    <td>${(item.message || '').slice(0, 180)}${(item.message || '').length > 180 ? '…' : ''}</td>
-                    <td>${item.predicted_category} / ${item.predicted_priority}</td>
-                    <td>${item.corrected_category} / ${item.corrected_priority}</td>
-                    <td><span class="pill">${item.corrected_priority}</span></td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          `;
-        } catch (error) {
-          root.innerHTML = '<div class="empty"><strong>Geçmiş verisine ulaşılamadı.</strong><p class="muted">Daha sonra tekrar deneyin.</p></div>';
+          const total = payload.total || 0;
+          const page = Math.floor(offset / pageSize) + 1;
+          const pages = Math.max(1, Math.ceil(total / pageSize));
+          document.getElementById('row-count').textContent = `${total} kayıt`;
+          document.getElementById('page-number').textContent = total ? `${page} / ${pages}` : '0 / 0';
+          document.getElementById('previous-page').disabled = offset === 0;
+          document.getElementById('next-page').disabled = offset + pageSize >= total;
+          renderHistory(payload.items || []);
+        } catch {
+          document.getElementById('row-count').textContent = 'Kayıtlar yüklenemedi';
+          document.getElementById('page-number').textContent = '—';
+          document.getElementById('previous-page').disabled = true;
+          document.getElementById('next-page').disabled = true;
+          root.replaceChildren();
+          const error = document.createElement('div');
+          error.className = 'empty';
+          const heading = document.createElement('strong');
+          heading.textContent = 'Geçmiş verisine ulaşılamadı.';
+          const detail = document.createElement('p');
+          detail.className = 'muted';
+          detail.textContent = 'Daha sonra tekrar deneyin.';
+          error.append(heading, detail);
+          root.appendChild(error);
         }
       }
 
+      document.getElementById('filters').addEventListener('submit', event => event.preventDefault());
+      document.getElementById('search').addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+          offset = 0;
+          loadHistory();
+        }, 250);
+      });
+      ['category', 'priority'].forEach(id => {
+        document.getElementById(id).addEventListener('change', () => {
+          offset = 0;
+          loadHistory();
+        });
+      });
+      document.getElementById('previous-page').addEventListener('click', () => {
+        offset = Math.max(0, offset - pageSize);
+        loadHistory();
+      });
+      document.getElementById('next-page').addEventListener('click', () => {
+        offset += pageSize;
+        loadHistory();
+      });
       loadHistory();
     </script>
   </body>

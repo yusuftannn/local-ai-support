@@ -161,6 +161,33 @@
         font-size: 13px;
         color: var(--muted);
       }
+      .breakdown {
+        display: grid;
+        gap: 12px;
+        margin-top: 16px;
+      }
+      .breakdown-row {
+        display: grid;
+        grid-template-columns: minmax(110px, 0.8fr) minmax(80px, 2fr) 28px;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+      }
+      .breakdown-track {
+        height: 10px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: var(--primary-soft);
+      }
+      .breakdown-fill {
+        height: 100%;
+        border-radius: inherit;
+        background: var(--primary);
+      }
+      .breakdown-count {
+        text-align: right;
+        font-weight: 700;
+      }
       @media (max-width: 760px) {
         .metrics, .grid {
           grid-template-columns: 1fr;
@@ -231,6 +258,18 @@
           <p class="muted" id="status-copy">Model bağlantısı bekleniyor.</p>
         </article>
       </section>
+      <section class="grid">
+        <article class="card">
+          <h2>Düzeltilmiş kategori dağılımı</h2>
+          <p class="small">Operatörlerin kaydettiği doğru kategori etiketleri.</p>
+          <div class="breakdown" id="category-breakdown"></div>
+        </article>
+        <article class="card">
+          <h2>Düzeltilmiş öncelik dağılımı</h2>
+          <p class="small">Operatörlerin kaydettiği doğru öncelik etiketleri.</p>
+          <div class="breakdown" id="priority-breakdown"></div>
+        </article>
+      </section>
     </div>
 
     <script>
@@ -243,11 +282,53 @@
           document.getElementById('evaluated-count').textContent = evaluated;
           document.getElementById('category-accuracy').textContent = metrics.category_accuracy == null ? '—' : `${(metrics.category_accuracy * 100).toFixed(1)}%`;
           document.getElementById('priority-accuracy').textContent = metrics.priority_accuracy == null ? '—' : `${(metrics.priority_accuracy * 100).toFixed(1)}%`;
+          renderBreakdown('category-breakdown', metrics.category_counts, {
+            hata: 'Hata bildirimi',
+            ozellik_istegi: 'Özellik isteği',
+            soru: 'Soru',
+            diger: 'Diğer',
+          });
+          renderBreakdown('priority-breakdown', metrics.priority_counts, {
+            yuksek: 'Yüksek',
+            normal: 'Normal',
+            dusuk: 'Düşük',
+          });
         } catch {
           document.getElementById('evaluated-count').textContent = '0';
           document.getElementById('category-accuracy').textContent = '—';
           document.getElementById('priority-accuracy').textContent = '—';
+          document.getElementById('category-breakdown').textContent = 'Veri yüklenemedi.';
+          document.getElementById('priority-breakdown').textContent = 'Veri yüklenemedi.';
         }
+      }
+
+      function renderBreakdown(containerId, counts, labels) {
+        const container = document.getElementById(containerId);
+        container.replaceChildren();
+        const maximum = Math.max(0, ...Object.values(counts || {}));
+        Object.entries(labels).forEach(([key, label]) => {
+          const count = counts?.[key] || 0;
+          const row = document.createElement('div');
+          row.className = 'breakdown-row';
+          const name = document.createElement('span');
+          name.textContent = label;
+          const track = document.createElement('div');
+          track.className = 'breakdown-track';
+          track.setAttribute('role', 'progressbar');
+          track.setAttribute('aria-label', label);
+          track.setAttribute('aria-valuemin', '0');
+          track.setAttribute('aria-valuemax', String(maximum));
+          track.setAttribute('aria-valuenow', String(count));
+          const fill = document.createElement('div');
+          fill.className = 'breakdown-fill';
+          fill.style.width = maximum ? `${count / maximum * 100}%` : '0%';
+          track.appendChild(fill);
+          const value = document.createElement('span');
+          value.className = 'breakdown-count';
+          value.textContent = count;
+          row.append(name, track, value);
+          container.appendChild(row);
+        });
       }
 
       async function loadHealth() {
