@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 ROOT = Path(__file__).parent
+ANGULAR_DIST = ROOT / "frontend" / "dist" / "frontend" / "browser"
 MODEL = os.getenv("OLLAMA_MODEL", "qwen3:1.7b")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
 FEEDBACK_DB = ROOT / "feedback.sqlite3"
@@ -77,23 +78,34 @@ iddia etme. Gerekirse açıklayıcı bilgi iste."""
 
 @app.get("/", include_in_schema=False)
 def index():
-    return FileResponse(ROOT / "static" / "index.html")
+    return angular_shell()
 
 
 @app.get("/dashboard", include_in_schema=False)
 def dashboard():
-    return FileResponse(ROOT / "static" / "dashboard.html")
+    return angular_shell()
 
 
 @app.get("/history", include_in_schema=False)
 def history():
-    return FileResponse(ROOT / "static" / "history.html")
+    return angular_shell()
+
+
+def angular_shell() -> FileResponse:
+    path = ANGULAR_DIST / "index.html"
+    if not path.is_file():
+        raise HTTPException(
+            status_code=503,
+            detail="Angular build çıktısı bulunamadı. frontend klasöründe npm run build çalıştırın.",
+        )
+    return FileResponse(path)
 
 
 @app.get("/api/health")
 async def health(request: Request):
+    ollama_client = getattr(request.app.state, "ollama_client", None) or httpx.AsyncClient()
     try:
-        response = await request.app.state.ollama_client.get(
+        response = await ollama_client.get(
             f"{OLLAMA_URL}/api/tags", timeout=5
         )
         response.raise_for_status()
@@ -114,8 +126,9 @@ async def analyze(body: AnalysisRequest, request: Request):
         "think": False,
         "options": {"temperature": 0, "num_predict": 700},
     }
+    ollama_client = getattr(request.app.state, "ollama_client", None) or httpx.AsyncClient()
     try:
-        response = await request.app.state.ollama_client.post(
+        response = await ollama_client.post(
             f"{OLLAMA_URL}/api/chat", json=payload, timeout=180
         )
         response.raise_for_status()
@@ -276,3 +289,11 @@ def export_feedback():
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": "attachment; filename=talep-etiketleri.csv"},
     )
+
+
+@app.get("/{file_path:path}", include_in_schema=False)
+def angular_asset(file_path: str):
+    path = ANGULAR_DIST / file_path
+    if path.is_file():
+        return FileResponse(path)
+    return Response(status_code=404)

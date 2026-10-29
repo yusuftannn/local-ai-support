@@ -25,10 +25,8 @@ def mock_ollama(monkeypatch, status=200, data=None, error=None):
 def test_page():
     response = client.get("/")
     assert response.status_code == 200
-    assert 'class="sidebar" id="sidebar"' in response.text
-    assert 'href="#request"' in response.text
-    assert 'href="#evaluation"' in response.text
-    assert 'href="#results"' in response.text
+    assert "<app-root>" in response.text
+    assert "AI Talep Analizi" in response.text
 
 
 def test_additional_pages():
@@ -36,8 +34,8 @@ def test_additional_pages():
     history = client.get("/history")
     assert dashboard.status_code == 200
     assert history.status_code == 200
-    assert 'Yönetim Paneli' in dashboard.text
-    assert 'Geçmiş değerlendirmeler' in history.text
+    assert "<app-root>" in dashboard.text
+    assert "<app-root>" in history.text
 
 
 def test_success(monkeypatch):

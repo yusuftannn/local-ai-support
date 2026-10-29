@@ -1,6 +1,7 @@
 # AI Talep Analizi
 
-Yerel bir model ile müşteri taleplerini sınıflandıran ve destek ekibine hızlı bir özet ile cevap taslağı hazırlayan mini bir Python projesidir. Proje, ücretli API anahtarı kullanmadan, bilgisayarınızda çalışan Ollama modeli üzerinden çalışır.
+Yerel Ollama modeli ile müşteri taleplerini sınıflandıran ve destek ekibine
+özet ile yanıt taslağı hazırlayan bir FastAPI + Angular uygulamasıdır.
 
 ## Nedir?
 
@@ -24,14 +25,15 @@ Amaç, destek taleplerini daha hızlı sınıflandırmak ve operatörlerin iş y
 - Mesaj etkisine göre LLM tabanlı öncelik önerisi
 - Operatör düzeltmeleriyle yerel etiketli veri toplama ve CSV dışa aktarma
 - Geri bildirimlerden kategori ve öncelik uyumunu ölçme
-- Web arayüzü ile hızlı test imkanı
+- Angular tabanlı web arayüzü
+- Talep analiz ekranı, yönetim paneli ve geçmiş kayıtlar
 - Hata, timeout, eksik model ve kötü JSON yanıtlarını yönetme
 
 ## Çalışma Mantığı
 
 Projede mesaj akışı şu şekildedir:
 
-Mesaj → FastAPI API → Ollama chat modeli → JSON doğrulama → web arayüzünde sonuç gösterimi
+Mesaj → Angular arayüzü → FastAPI API → Ollama chat modeli → JSON doğrulama → Angular arayüzünde sonuç
 
 Model, sadece belirlenen şema içinde dönüt üretir:
 
@@ -50,31 +52,77 @@ Bu yaklaşım, uygulamanın çıktısını tahmin edilebilir ve kullanılabilir 
 - Pydantic
 - Ollama
 - HTTPX
-- HTML / JavaScript
+- Angular / TypeScript
 
-## Proje Yapısı
+## Kurulum
 
-- `main.py` — FastAPI uygulaması, model çağrısı ve veri doğrulama
-- `static/index.html` — arayüz ve istemci tarafı örnek kullanım
-- `test_main.py` — API davranışlarını test eden senaryolar
-- `feedback.sqlite3` — operatör onayıyla yerel olarak saklanan etiketli talepler
-- `requirements.txt` — proje bağımlılıkları
+Gereksinimler:
 
-## Çalıştırma
+- Python 3.10+
+- Node.js ve npm
+- Ollama
 
-Önce Ollama kurulu olmalı ve bir model indirilmeli; ardından proje başlatılabilir:
+Bağımlılıkları kurun ve modeli indirin:
 
 ```bash
 ollama pull qwen3:1.7b
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe -m uvicorn main:app --reload --host 127.0.0.1
+cd frontend
+npm install
+cd ..
 ```
 
-Sonrasında tarayıcıdan uygulamaya erişilebilir:
+## Geliştirme
 
-- http://127.0.0.1:8000
-- http://127.0.0.1:8000/docs
+Angular geliştirme sunucusu ve FastAPI için iki ayrı terminal kullanın.
+
+Terminal 1 — FastAPI:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Terminal 2 — Angular:
+
+```powershell
+cd frontend
+npm start
+```
+
+Uygulama:
+
+- http://localhost:4200 — Angular arayüzü
+- http://127.0.0.1:8000/docs — FastAPI API dokümantasyonu
+
+Angular geliştirme sunucusundaki `/api` istekleri
+`frontend/proxy.conf.json` ile FastAPI'nin `8000` portuna yönlendirilir.
+FastAPI çalışmıyorsa `ECONNREFUSED` proxy hatası alınır.
+
+## Production derlemesi
+
+Angular çıktısını oluşturun:
+
+```powershell
+cd frontend
+npm run build
+cd ..
+```
+
+Ardından FastAPI'yi başlatın:
+
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000
+```
+
+FastAPI, `frontend/dist/frontend/browser` altındaki Angular çıktısını `/`,
+`/dashboard` ve `/history` rotalarında sunar.
+
+## Testler
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest -q
+```
 
 ## Notlar
 
@@ -83,3 +131,16 @@ Sonrasında tarayıcıdan uygulamaya erişilebilir:
 - Geri bildirim kaydı yalnızca onay kutusu işaretlendiğinde yapılır. Talep metinleri bu bilgisayardaki SQLite veritabanında saklanır; hassas veya kişisel verileri kaydetmeyin.
 - Gösterilen uyum oranları, operatörün değerlendirdiği kayıtlar üzerindeki oranlardır; tüm taleplere genellenmiş doğruluk garantisi değildir.
 - Amaç, iş akışını göstermek ve kişisel veya küçük ölçekli otomasyon için temel bir yapı sunmaktır.
+
+## İletişim
+
+Sorularınız, geri bildirimleriniz veya iş birliği fırsatları için dilediğiniz zaman iletişime geçebilirsiniz.
+
+🌐 **Website**  
+https://www.yusuftan.com.tr
+
+💼 **LinkedIn**  
+https://www.linkedin.com/in/yusuftann/
+
+📧 **Email**  
+yusuftan41@hotmail.com

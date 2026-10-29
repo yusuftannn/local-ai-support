@@ -1,0 +1,58 @@
+<app-layout>
+  <main class="analyze-page">
+    <header class="page-header">
+      <span class="tag">ANGULAR × YAPAY ZEKA</span>
+      <h1>Talebi anla. Yanıtı hazırla.</h1>
+      <p>Yerel AI modeliyle kategori, konu, özet ve yanıt taslağı oluştur.</p>
+      <div class="status" role="status">{{ status }}</div>
+    </header>
+    <div class="overview-grid">
+      <section class="card">
+        <div class="result-heading"><h2>Model değerlendirmesi</h2><a href="/api/feedback/export" download>CSV indir</a></div>
+        @if (metrics?.evaluated_count) {
+          <div class="stats-grid">
+            <div><h2>Değerlendirilen</h2><div class="stat-value">{{ metrics?.evaluated_count }}</div></div>
+            <div><h2>Kategori uyumu</h2><div class="stat-value">{{ metrics?.category_accuracy | percent:'1.1-1' }}</div></div>
+            <div><h2>Öncelik uyumu</h2><div class="stat-value">{{ metrics?.priority_accuracy | percent:'1.1-1' }}</div></div>
+          </div>
+        } @else { <p>Henüz değerlendirilen talep yok.</p> }
+      </section>
+      <section class="card">
+        <form (ngSubmit)="analyze()">
+          <label for="message">Müşteri mesajı</label>
+          <textarea id="message" name="message" [(ngModel)]="message" minlength="5" maxlength="3000" required placeholder="Video yükledim ama ikinci sahnede açılmıyor."></textarea>
+          <div class="character-count">{{ message.length }} / 3000</div>
+          <div>
+            <button type="button" class="example" (click)="useExample('Video yükledim ama ikinci sahnede açılmıyor.')">Video yükledim ama ikinci sahnede açılmıyor.</button>
+            <button type="button" class="example" (click)="useExample('Raporları Excel olarak indirebilir miyiz?')">Raporları Excel olarak indirebilir miyiz?</button>
+          </div>
+          <button [disabled]="loading || message.trim().length < 5">{{ loading ? 'Analiz ediliyor…' : 'Analiz et' }}</button>
+        </form>
+        @if (error) { <p class="error" role="alert">{{ error }}</p> }
+      </section>
+    </div>
+    @if (result; as item) {
+      <section class="results" aria-live="polite">
+        <div class="grid">
+          <div class="card"><h2>Öncelik</h2><div class="priority" [attr.data-level]="item.priority">{{ item.priority }}</div></div>
+          <div class="card"><h2>Kategori</h2><div class="value">{{ item.category }}</div></div>
+          <div class="card"><h2>Konu</h2><div class="value">{{ item.topic }}</div></div>
+        </div>
+        <div class="card"><h2>Özet</h2><div class="value">{{ item.summary }}</div></div>
+        <div class="card"><div class="result-heading"><h2>Yanıt taslağı</h2><button type="button" class="copy-button" (click)="copyReply()">Yanıtı kopyala</button></div><div class="value">{{ item.reply }}</div><p>Göndermeden önce taslağı kontrol et.</p></div>
+        <section class="card">
+          <h2>Model tahminini değerlendir</h2><p>Seçtiğiniz etiketler ve talep metni bu cihazda yerel olarak saklanır.</p>
+          <form (ngSubmit)="saveFeedback()">
+            <div class="feedback-form">
+              <label>Doğru kategori<select name="category" [(ngModel)]="correctedCategory"><option value="hata">Hata bildirimi</option><option value="ozellik_istegi">Özellik isteği</option><option value="soru">Soru</option><option value="diger">Diğer</option></select></label>
+              <label>Doğru öncelik<select name="priority" [(ngModel)]="correctedPriority"><option value="dusuk">Düşük</option><option value="normal">Normal</option><option value="yuksek">Yüksek</option></select></label>
+              <button [disabled]="!consent" type="submit">Değerlendirmeyi kaydet</button>
+            </div>
+            <label class="consent"><input type="checkbox" name="consent" [(ngModel)]="consent"> Bu talep metninin ve etiketlerin yerel değerlendirme verisine kaydedilmesini onaylıyorum.</label>
+          </form>
+          <p role="status">{{ feedbackStatus }}</p>
+        </section>
+      </section>
+    }
+  </main>
+</app-layout>
