@@ -103,7 +103,9 @@ def angular_shell() -> FileResponse:
 
 @app.get("/api/health")
 async def health(request: Request):
-    ollama_client = getattr(request.app.state, "ollama_client", None) or httpx.AsyncClient()
+    ollama_client = getattr(request.app.state, "ollama_client", None)
+    owns_client = ollama_client is None
+    ollama_client = ollama_client or httpx.AsyncClient()
     try:
         response = await ollama_client.get(
             f"{OLLAMA_URL}/api/tags", timeout=5
@@ -113,6 +115,9 @@ async def health(request: Request):
         return {"ollama_available": True, "model": MODEL, "model_ready": MODEL in models}
     except (httpx.HTTPError, ValueError, KeyError):
         return {"ollama_available": False, "model": MODEL, "model_ready": False}
+    finally:
+        if owns_client:
+            await ollama_client.aclose()
 
 
 @app.post("/api/analyze", response_model=AnalysisResult)
@@ -147,7 +152,7 @@ async def analyze(body: AnalysisRequest, request: Request):
 
 
 def open_feedback_db():
-    connection = sqlite3.connect(FEEDBACK_DB)
+    connection = sqlite3.connect(FEEDBACK_DB, timeout=10)
     connection.row_factory = sqlite3.Row
     connection.execute("""CREATE TABLE IF NOT EXISTS feedback (
         id INTEGER PRIMARY KEY,
@@ -159,6 +164,13 @@ def open_feedback_db():
         corrected_priority TEXT NOT NULL,
         created_at TEXT NOT NULL
     )""")
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_feedback_created_at ON feedback (id DESC)"
+    )
+    connection.execute(
+        "CREATE INDEX IF NOT EXISTS idx_feedback_corrected_labels "
+        "ON feedback (corrected_category, corrected_priority)"
+    )
     return connection
 
 
@@ -172,9 +184,15 @@ def list_feedback(
 ):
     conditions = []
     parameters = []
-    if search.strip():
-        conditions.append("message LIKE ? COLLATE NOCASE")
-        parameters.append(f"%{search.strip()}%")
+    search_term = search.strip()
+    if search_term:
+        escaped_search = (
+            search_term.replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
+        conditions.append("message LIKE ? COLLATE NOCASE ESCAPE '\\'")
+        parameters.append(f"%{escaped_search}%")
     if category is not None:
         conditions.append("corrected_category = ?")
         parameters.append(category)
@@ -293,7 +311,11 @@ def export_feedback():
 
 @app.get("/{file_path:path}", include_in_schema=False)
 def angular_asset(file_path: str):
-    path = ANGULAR_DIST / file_path
-    if path.is_file():
-        return FileResponse(path)
+    requested_path = (ANGULAR_DIST / file_path).resolve()
+    try:
+        requested_path.relative_to(ANGULAR_DIST.resolve())
+    except ValueError:
+        return Response(status_code=404)
+    if requested_path.is_file():
+        return FileResponse(requested_path)
     return Response(status_code=404)

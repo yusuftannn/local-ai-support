@@ -18,6 +18,7 @@ export class AnalyzeComponent implements OnInit {
   status = 'Model bağlantısı kontrol ediliyor…';
   error = '';
   loading = false;
+  savingFeedback = false;
   consent = false;
   correctedCategory = 'hata';
   correctedPriority = 'normal';
@@ -61,7 +62,9 @@ export class AnalyzeComponent implements OnInit {
   }
 
   saveFeedback() {
-    if (!this.result || !this.consent) return;
+    if (!this.result || !this.consent || this.savingFeedback) return;
+    this.savingFeedback = true;
+    this.feedbackStatus = '';
     this.api.saveFeedback({
       message: this.message,
       predicted_category: this.result.category,
@@ -69,14 +72,25 @@ export class AnalyzeComponent implements OnInit {
       predicted_priority: this.result.priority,
       corrected_priority: this.correctedPriority,
     }).subscribe({
-      next: () => { this.feedbackStatus = 'Değerlendirme kaydedildi.'; this.loadMetrics(); },
-      error: () => this.feedbackStatus = 'Değerlendirme kaydedilemedi.',
+      next: () => {
+        this.feedbackStatus = 'Değerlendirme kaydedildi.';
+        this.savingFeedback = false;
+        this.loadMetrics();
+      },
+      error: () => {
+        this.feedbackStatus = 'Değerlendirme kaydedilemedi.';
+        this.savingFeedback = false;
+      },
     });
   }
 
   async copyReply() {
     if (!this.result) return;
-    await navigator.clipboard.writeText(this.result.reply);
-    this.feedbackStatus = 'Yanıt taslağı kopyalandı.';
+    try {
+      await navigator.clipboard.writeText(this.result.reply);
+      this.feedbackStatus = 'Yanıt taslağı kopyalandı.';
+    } catch {
+      this.feedbackStatus = 'Yanıt taslağı kopyalanamadı. Metni elle seçin.';
+    }
   }
 }

@@ -34,8 +34,8 @@
     @if (result; as item) {
       <section class="results" aria-live="polite">
         <div class="grid">
-          <div class="card"><h2>Öncelik</h2><div class="priority" [attr.data-level]="item.priority">{{ item.priority }}</div></div>
-          <div class="card"><h2>Kategori</h2><div class="value">{{ item.category }}</div></div>
+          <div class="card"><h2>Öncelik</h2><div class="priority" [attr.data-level]="item.priority">{{ item.priority === 'yuksek' ? 'Yüksek' : item.priority === 'dusuk' ? 'Düşük' : 'Normal' }}</div></div>
+          <div class="card"><h2>Kategori</h2><div class="value">{{ item.category === 'hata' ? 'Hata bildirimi' : item.category === 'ozellik_istegi' ? 'Özellik isteği' : item.category === 'soru' ? 'Soru' : 'Diğer' }}</div></div>
           <div class="card"><h2>Konu</h2><div class="value">{{ item.topic }}</div></div>
         </div>
         <div class="card"><h2>Özet</h2><div class="value">{{ item.summary }}</div></div>
@@ -46,7 +46,7 @@
             <div class="feedback-form">
               <label>Doğru kategori<select name="category" [(ngModel)]="correctedCategory"><option value="hata">Hata bildirimi</option><option value="ozellik_istegi">Özellik isteği</option><option value="soru">Soru</option><option value="diger">Diğer</option></select></label>
               <label>Doğru öncelik<select name="priority" [(ngModel)]="correctedPriority"><option value="dusuk">Düşük</option><option value="normal">Normal</option><option value="yuksek">Yüksek</option></select></label>
-              <button [disabled]="!consent" type="submit">Değerlendirmeyi kaydet</button>
+              <button [disabled]="!consent || savingFeedback" type="submit">{{ savingFeedback ? 'Kaydediliyor…' : 'Değerlendirmeyi kaydet' }}</button>
             </div>
             <label class="consent"><input type="checkbox" name="consent" [(ngModel)]="consent"> Bu talep metninin ve etiketlerin yerel değerlendirme verisine kaydedilmesini onaylıyorum.</label>
           </form>

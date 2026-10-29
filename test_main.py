@@ -38,6 +38,11 @@ def test_additional_pages():
     assert "<app-root>" in history.text
 
 
+def test_asset_path_traversal_is_not_served():
+    response = main.angular_asset("../../main.py")
+    assert response.status_code == 404
+
+
 def test_success(monkeypatch):
     import json
     mock_ollama(monkeypatch, data={"message": {"content": json.dumps(RESULT)}})
@@ -122,6 +127,7 @@ def test_feedback_search_filters_and_pagination(monkeypatch, tmp_path):
     ).json()
     assert filtered["total"] == 1
     assert filtered["items"][0]["message"] == "Excel dışa aktarma özelliği"
+    assert client.get("/api/feedback", params={"search": "%"}).json()["total"] == 0
 
     page = client.get("/api/feedback", params={"limit": 1, "offset": 1}).json()
     assert page["total"] == 3
