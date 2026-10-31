@@ -17,6 +17,7 @@ export class AnalyzeComponent implements OnInit {
   metrics: Metrics | null = null;
   status = 'Model bağlantısı kontrol ediliyor…';
   error = '';
+  requestId = '';
   loading = false;
   savingFeedback = false;
   consent = false;
@@ -46,6 +47,7 @@ export class AnalyzeComponent implements OnInit {
     if (this.message.trim().length < 5) return;
     this.loading = true;
     this.error = '';
+    this.requestId = '';
     this.result = null;
     this.api.analyze(this.message).subscribe({
       next: (result) => {
@@ -56,6 +58,7 @@ export class AnalyzeComponent implements OnInit {
       },
       error: (error) => {
         this.error = error.error?.detail || 'Analiz yapılamadı. Tekrar deneyin.';
+        this.requestId = error.headers?.get('X-Request-ID') || '';
         this.loading = false;
       },
     });

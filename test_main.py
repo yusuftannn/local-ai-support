@@ -1,3 +1,5 @@
+import json
+
 import httpx
 import pytest
 from fastapi.testclient import TestClient
@@ -27,6 +29,9 @@ def test_page():
     assert response.status_code == 200
     assert "<app-root>" in response.text
     assert "AI Talep Analizi" in response.text
+    assert response.headers["X-Request-ID"]
+    assert response.headers["X-Content-Type-Options"] == "nosniff"
+    assert response.headers["X-Frame-Options"] == "DENY"
 
 
 def test_additional_pages():
@@ -144,3 +149,24 @@ def test_feedback_search_filters_and_pagination(monkeypatch, tmp_path):
 def test_errors(monkeypatch, status, error, expected):
     mock_ollama(monkeypatch, status=status, data={}, error=error)
     assert client.post("/api/analyze", json={"message": "Video açılmıyor."}).status_code == expected
+
+
+def test_feedback_database_uses_concurrent_access_settings(monkeypatch, tmp_path):
+    monkeypatch.setattr(main, "FEEDBACK_DB", tmp_path / "feedback.sqlite3")
+    with main.open_feedback_db() as connection:
+        assert connection.execute("PRAGMA journal_mode").fetchone()[0].lower() == "wal"
+        assert connection.execute("PRAGMA synchronous").fetchone()[0] == 1
+
+
+def test_analyze_rate_limit(monkeypatch):
+    main.rate_limit_buckets.clear()
+    monkeypatch.setattr(main, "RATE_LIMIT_MAX_REQUESTS", 1)
+    monkeypatch.setattr(main, "RATE_LIMIT_WINDOW_SECONDS", 60)
+    mock_ollama(monkeypatch, data={"message": {"content": json.dumps(RESULT)}})
+
+    assert client.post("/api/analyze", json={"message": "Video açılmıyor."}).status_code == 200
+    limited = client.post("/api/analyze", json={"message": "Video açılmıyor."})
+    assert limited.status_code == 429
+    assert limited.headers["Retry-After"]
+    assert limited.headers["X-Request-ID"]
+    main.rate_limit_buckets.clear()

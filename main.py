@@ -2,7 +2,11 @@ import json
 import os
 import csv
 import io
+import logging
 import sqlite3
+import threading
+import time
+import uuid
 from contextlib import asynccontextmanager
 from contextlib import closing
 from datetime import datetime, timezone
@@ -11,7 +15,7 @@ from typing import Literal
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from pydantic import BaseModel, Field, ValidationError, field_validator
 
 ROOT = Path(__file__).parent
@@ -19,6 +23,28 @@ ANGULAR_DIST = ROOT / "frontend" / "dist" / "frontend" / "browser"
 MODEL = os.getenv("OLLAMA_MODEL", "qwen3:1.7b")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
 FEEDBACK_DB = ROOT / "feedback.sqlite3"
+
+
+def positive_env_float(name: str, default: str) -> float:
+    value = float(os.getenv(name, default))
+    if value <= 0:
+        raise ValueError(f"{name} pozitif bir değer olmalıdır")
+    return value
+
+
+def positive_env_int(name: str, default: str) -> int:
+    value = int(os.getenv(name, default))
+    if value <= 0:
+        raise ValueError(f"{name} pozitif bir değer olmalıdır")
+    return value
+
+
+OLLAMA_TIMEOUT_SECONDS = positive_env_float("OLLAMA_TIMEOUT_SECONDS", "180")
+RATE_LIMIT_WINDOW_SECONDS = positive_env_int("ANALYZE_RATE_LIMIT_WINDOW", "60")
+RATE_LIMIT_MAX_REQUESTS = positive_env_int("ANALYZE_RATE_LIMIT_MAX", "30")
+logger = logging.getLogger("ai_talep_paneli")
+rate_limit_lock = threading.Lock()
+rate_limit_buckets: dict[str, list[float]] = {}
 
 
 @asynccontextmanager
@@ -31,6 +57,54 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="AI Talep Analizi", version="0.1.0", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def operational_middleware(request: Request, call_next):
+    request_id = str(uuid.uuid4())
+    started_at = time.perf_counter()
+    response = None
+    try:
+        if request.url.path == "/api/analyze" and request.method == "POST":
+            client_ip = request.client.host if request.client else "unknown"
+            now = time.monotonic()
+            with rate_limit_lock:
+                bucket = [
+                    timestamp
+                    for timestamp in rate_limit_buckets.get(client_ip, [])
+                    if now - timestamp < RATE_LIMIT_WINDOW_SECONDS
+                ]
+                if len(bucket) >= RATE_LIMIT_MAX_REQUESTS:
+                    retry_after = max(
+                        1, int(RATE_LIMIT_WINDOW_SECONDS - (now - bucket[0])) + 1
+                    )
+                    rate_limit_buckets[client_ip] = bucket
+                    response = JSONResponse(
+                        status_code=429,
+                        content={"detail": "Çok fazla analiz isteği gönderildi. Lütfen bekleyin."},
+                        headers={"Retry-After": str(retry_after)},
+                    )
+                else:
+                    bucket.append(now)
+                    rate_limit_buckets[client_ip] = bucket
+                    response = await call_next(request)
+        else:
+            response = await call_next(request)
+    finally:
+        duration_ms = (time.perf_counter() - started_at) * 1000
+        logger.info(
+            "request_completed method=%s path=%s status=%s duration_ms=%.1f request_id=%s",
+            request.method,
+            request.url.path,
+            response.status_code if response else 500,
+            duration_ms,
+            request_id,
+        )
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 
 class AnalysisRequest(BaseModel):
@@ -134,7 +208,7 @@ async def analyze(body: AnalysisRequest, request: Request):
     ollama_client = getattr(request.app.state, "ollama_client", None) or httpx.AsyncClient()
     try:
         response = await ollama_client.post(
-            f"{OLLAMA_URL}/api/chat", json=payload, timeout=180
+            f"{OLLAMA_URL}/api/chat", json=payload, timeout=OLLAMA_TIMEOUT_SECONDS
         )
         response.raise_for_status()
     except httpx.TimeoutException as exc:
@@ -154,6 +228,9 @@ async def analyze(body: AnalysisRequest, request: Request):
 def open_feedback_db():
     connection = sqlite3.connect(FEEDBACK_DB, timeout=10)
     connection.row_factory = sqlite3.Row
+    connection.execute("PRAGMA journal_mode=WAL")
+    connection.execute("PRAGMA synchronous=NORMAL")
+    connection.execute("PRAGMA busy_timeout=10000")
     connection.execute("""CREATE TABLE IF NOT EXISTS feedback (
         id INTEGER PRIMARY KEY,
         message TEXT NOT NULL,

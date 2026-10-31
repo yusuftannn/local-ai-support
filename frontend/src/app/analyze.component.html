@@ -28,7 +28,10 @@
           </div>
           <button [disabled]="loading || message.trim().length < 5">{{ loading ? 'Analiz ediliyor…' : 'Analiz et' }}</button>
         </form>
-        @if (error) { <p class="error" role="alert">{{ error }}</p> }
+        @if (error) {
+          <p class="error" role="alert">{{ error }}</p>
+          @if (requestId) { <p class="request-id">Destek için istek kodu: {{ requestId }}</p> }
+        }
       </section>
     </div>
     @if (result; as item) {

@@ -77,6 +77,24 @@ cd ..
 
 Angular geliştirme sunucusu ve FastAPI için iki ayrı terminal kullanın.
 
+Üretimde analiz uç noktası istemci IP'si başına varsayılan olarak 60 saniyede
+30 istek kabul eder. Bu değerler ve model zaman aşımı ortam değişkenleriyle
+ayarlanabilir:
+
+```powershell
+$env:ANALYZE_RATE_LIMIT_MAX = "60"
+$env:ANALYZE_RATE_LIMIT_WINDOW = "60"
+$env:OLLAMA_TIMEOUT_SECONDS = "180"
+```
+
+Her API yanıtında `X-Request-ID` bulunur. Bu kimlik, uygulama loglarındaki
+istek süresi ve HTTP durumuyla birlikte hata ayıklamayı kolaylaştırır. Yanıtlar
+ayrıca temel tarayıcı güvenlik başlıklarıyla döner.
+
+SQLite geri bildirim veritabanı eşzamanlı okuma/yazma için WAL modunda çalışır.
+Üretimde `feedback.sqlite3` dosyasını düzenli olarak yedekleyin; bu dosya
+müşteri mesajları içerebilir.
+
 Terminal 1 — FastAPI:
 
 ```powershell
