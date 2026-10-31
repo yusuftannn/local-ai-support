@@ -15,10 +15,11 @@ import { RouterLink } from '@angular/router';
           <a routerLink="/">Ana sayfa</a>
           <a routerLink="/dashboard">Yönetim paneli</a>
           <a routerLink="/history">Geçmiş</a>
-          <a href="/docs">API</a>
+          <a href="/docs">API dokümantasyonu</a>
         </nav>
       </div>
       <ng-content />
+      <footer class="footer">AI Talep Analizi · Destek operasyonları için akıllı çalışma alanı</footer>
     </div>
   `,
 })

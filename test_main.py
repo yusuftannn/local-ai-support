@@ -43,6 +43,16 @@ def test_additional_pages():
     assert "<app-root>" in history.text
 
 
+def test_readiness_reports_unavailable_model(monkeypatch):
+    async def unavailable_health(request):
+        return {"ollama_available": True, "model": main.MODEL, "model_ready": False}
+
+    monkeypatch.setattr(main, "health", unavailable_health)
+    response = client.get("/api/ready")
+    assert response.status_code == 503
+    assert response.json()["detail"]["status"] == "not_ready"
+
+
 def test_asset_path_traversal_is_not_served():
     response = main.angular_asset("../../main.py")
     assert response.status_code == 404

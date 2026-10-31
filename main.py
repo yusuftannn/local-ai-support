@@ -23,6 +23,9 @@ ANGULAR_DIST = ROOT / "frontend" / "dist" / "frontend" / "browser"
 MODEL = os.getenv("OLLAMA_MODEL", "qwen3:1.7b")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
 FEEDBACK_DB = ROOT / "feedback.sqlite3"
+configured_feedback_db = os.getenv("FEEDBACK_DB_PATH")
+if configured_feedback_db:
+    FEEDBACK_DB = Path(configured_feedback_db).expanduser()
 
 
 def positive_env_float(name: str, default: str) -> float:
@@ -56,7 +59,12 @@ async def lifespan(app: FastAPI):
         await app.state.ollama_client.aclose()
 
 
-app = FastAPI(title="AI Talep Analizi", version="0.1.0", lifespan=lifespan)
+app = FastAPI(
+    title="AI Talep Analizi API",
+    description="Müşteri taleplerini sınıflandıran ve destek yanıtı taslağı oluşturan servis.",
+    version="1.0.0",
+    lifespan=lifespan,
+)
 
 
 @app.middleware("http")
@@ -194,6 +202,22 @@ async def health(request: Request):
             await ollama_client.aclose()
 
 
+@app.get("/api/ready")
+async def readiness(request: Request):
+    status = await health(request)
+    if not status["ollama_available"] or not status["model_ready"]:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "not_ready",
+                "ollama_available": status["ollama_available"],
+                "model": status["model"],
+                "model_ready": status["model_ready"],
+            },
+        )
+    return {"status": "ready", **status}
+
+
 @app.post("/api/analyze", response_model=AnalysisResult)
 async def analyze(body: AnalysisRequest, request: Request):
     payload = {
@@ -226,6 +250,7 @@ async def analyze(body: AnalysisRequest, request: Request):
 
 
 def open_feedback_db():
+    FEEDBACK_DB.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(FEEDBACK_DB, timeout=10)
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA journal_mode=WAL")

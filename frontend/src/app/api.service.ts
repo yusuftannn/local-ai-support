@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 
 export interface AnalysisResult {
   category: 'hata' | 'ozellik_istegi' | 'soru' | 'diger';
@@ -39,7 +39,14 @@ export class ApiService {
   private readonly http = inject(HttpClient);
 
   analyze(message: string): Observable<AnalysisResult> {
-    return this.http.post<AnalysisResult>('/api/analyze', { message });
+    return this.http.post<AnalysisResult>('/api/analyze', { message }).pipe(
+      map((result) => {
+        if (!result || typeof result.reply !== 'string' || typeof result.summary !== 'string') {
+          throw new Error('Analiz yanıtı beklenen formatta değil.');
+        }
+        return result;
+      }),
+    );
   }
 
   health(): Observable<Health> {

@@ -85,6 +85,7 @@ ayarlanabilir:
 $env:ANALYZE_RATE_LIMIT_MAX = "60"
 $env:ANALYZE_RATE_LIMIT_WINDOW = "60"
 $env:OLLAMA_TIMEOUT_SECONDS = "180"
+$env:FEEDBACK_DB_PATH = "D:\data\ai-talep\feedback.sqlite3"
 ```
 
 Her API yanıtında `X-Request-ID` bulunur. Bu kimlik, uygulama loglarındaki
@@ -136,19 +137,23 @@ Ardından FastAPI'yi başlatın:
 FastAPI, `frontend/dist/frontend/browser` altındaki Angular çıktısını `/`,
 `/dashboard` ve `/history` rotalarında sunar.
 
+İzleme sistemleri için `/api/health` Ollama durumunu raporlar; yalnızca servis
+ve model kullanıma hazır olduğunda `200` dönen `/api/ready` endpoint'i
+deployment health check olarak kullanılabilir.
+
 ## Testler
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest -q
 ```
 
-## Notlar
+## Üretim notları
 
-- Bu proje, gerçek üretim seviyesi bir destek sistemi değil; öğrenme ve prototip geliştirme amacı taşır.
+- Model çıktıları destek ekibi tarafından gönderilmeden önce kontrol edilmelidir; yapay zeka önerileri otomatik olarak müşteriye iletilmez.
 - Model yanıtları her zaman doğru olmayabilir; kullanıcı onayı ve kontroller önemlidir.
 - Geri bildirim kaydı yalnızca onay kutusu işaretlendiğinde yapılır. Talep metinleri bu bilgisayardaki SQLite veritabanında saklanır; hassas veya kişisel verileri kaydetmeyin.
 - Gösterilen uyum oranları, operatörün değerlendirdiği kayıtlar üzerindeki oranlardır; tüm taleplere genellenmiş doğruluk garantisi değildir.
-- Amaç, iş akışını göstermek ve kişisel veya küçük ölçekli otomasyon için temel bir yapı sunmaktır.
+- Üretimde `OLLAMA_URL`, `OLLAMA_MODEL`, rate limit değerleri ve veritabanı yedekleme politikasını ortamınıza göre belirleyin.
 
 ## İletişim
 

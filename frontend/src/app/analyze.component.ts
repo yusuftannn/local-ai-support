@@ -1,6 +1,7 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject } from '@angular/core';
 import { PercentPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { finalize } from 'rxjs';
 import { ApiService, AnalysisResult, Metrics } from './api.service';
 import { LayoutComponent } from './layout.component';
 
@@ -12,6 +13,7 @@ import { LayoutComponent } from './layout.component';
 })
 export class AnalyzeComponent implements OnInit {
   private readonly api = inject(ApiService);
+  private readonly changeDetector = inject(ChangeDetectorRef);
   message = '';
   result: AnalysisResult | null = null;
   metrics: Metrics | null = null;
@@ -41,7 +43,9 @@ export class AnalyzeComponent implements OnInit {
     this.api.metrics().subscribe({ next: (metrics) => this.metrics = metrics });
   }
 
-  useExample(text: string) { this.message = text; }
+  useExample(text: string) {
+    this.message = text;
+  }
 
   analyze() {
     if (this.message.trim().length < 5) return;
@@ -49,17 +53,24 @@ export class AnalyzeComponent implements OnInit {
     this.error = '';
     this.requestId = '';
     this.result = null;
-    this.api.analyze(this.message).subscribe({
+    this.api.analyze(this.message).pipe(
+      finalize(() => {
+        this.loading = false;
+        this.changeDetector.markForCheck();
+      }),
+    ).subscribe({
       next: (result) => {
         this.result = result;
         this.correctedCategory = result.category;
         this.correctedPriority = result.priority;
-        this.loading = false;
+        this.changeDetector.markForCheck();
       },
       error: (error) => {
-        this.error = error.error?.detail || 'Analiz yapılamadı. Tekrar deneyin.';
+        this.error = typeof error.error?.detail === 'string'
+          ? error.error.detail
+          : 'Analiz yanıtı alınamadı. Sunucu loglarını kontrol edin.';
         this.requestId = error.headers?.get('X-Request-ID') || '';
-        this.loading = false;
+        this.changeDetector.markForCheck();
       },
     });
   }
